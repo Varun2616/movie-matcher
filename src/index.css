@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #ff4b4b; /* Tinder-like primary red */
+  --color-brand-hover: #e04343;
+  --color-success: #4cd964;
+  --color-veto: #8e8e93;
+}
+
+@layer base {
+  body {
+    @apply bg-zinc-950 text-white antialiased overflow-hidden selection:bg-brand selection:text-white;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-black/40 backdrop-blur-md border border-white/10;
+  }
+}
