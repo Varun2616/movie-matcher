@@ -77,3 +77,12 @@ export async function startRoom(roomCode, hostSessionId) {
   }
   return res.json();
 }
+
+export async function fetchLeaderboard(roomCode) {
+  const res = await fetch(`${API_BASE}/api/room/${roomCode}/leaderboard`);
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to fetch leaderboard');
+  }
+  return res.json();
+}
