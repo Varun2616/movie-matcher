@@ -1,15 +1,46 @@
 import uuid
+import os
 import random
 import string
+import requests
 from flask import Blueprint, request, jsonify
-from models import db, Room, User
+from models import db, Room, User, RoomMovie
 
 room_bp = Blueprint('room', __name__, url_prefix='/api/room')
+
+TMDB_BASE_URL = 'https://api.themoviedb.org/3'
 
 def generate_room_code(length=6):
     """Generate a random uppercase alphanumeric string of fixed length."""
     letters_and_digits = string.ascii_uppercase + string.digits
     return ''.join(random.choice(letters_and_digits) for i in range(length))
+
+
+def fetch_tmdb_movies(api_key, num_pages=2):
+    """Fetch popular movies from TMDB discover endpoint."""
+    movies = []
+    for page in range(1, num_pages + 1):
+        try:
+            resp = requests.get(
+                f'{TMDB_BASE_URL}/discover/movie',
+                params={
+                    'api_key': api_key,
+                    'sort_by': 'popularity.desc',
+                    'include_adult': 'false',
+                    'include_video': 'false',
+                    'language': 'en-US',
+                    'page': page,
+                    'vote_count.gte': 100
+                },
+                timeout=10
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            movies.extend(data.get('results', []))
+        except requests.RequestException as e:
+            print(f"TMDB API error on page {page}: {e}")
+    return movies
+
 
 @room_bp.route('/create', methods=['POST'])
 def create_room():
@@ -30,6 +61,27 @@ def create_room():
     
     try:
         db.session.add(new_room)
+        db.session.flush()  # Get the room ID without committing yet
+
+        # Fetch movies from TMDB and seed them into the room
+        api_key = os.environ.get('TMDB_API_KEY')
+        if api_key:
+            tmdb_movies = fetch_tmdb_movies(api_key)
+            for m in tmdb_movies:
+                release_date = m.get('release_date', '')
+                release_year = int(release_date[:4]) if release_date and len(release_date) >= 4 else None
+
+                room_movie = RoomMovie(
+                    room_id=new_room.id,
+                    tmdb_id=m.get('id'),
+                    title=m.get('title', 'Unknown'),
+                    release_year=release_year,
+                    poster_path=m.get('poster_path'),
+                    overview=m.get('overview', ''),
+                    vote_average=m.get('vote_average')
+                )
+                db.session.add(room_movie)
+        
         db.session.commit()
         return jsonify({
             "room_code": code,
@@ -80,3 +132,14 @@ def join_room():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": "Failed to join room", "details": str(e)}), 500
+
+
+@room_bp.route('/<room_code>/movies', methods=['GET'])
+def get_room_movies(room_code):
+    room = Room.query.filter_by(room_code=room_code.upper()).first()
+    
+    if not room:
+        return jsonify({"error": "Room not found"}), 404
+    
+    movies = RoomMovie.query.filter_by(room_id=room.id).all()
+    return jsonify([m.to_dict() for m in movies]), 200
