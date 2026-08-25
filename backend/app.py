@@ -12,8 +12,9 @@ load_dotenv()
 def create_app():
     app = Flask(__name__)
     
-    # Enable CORS for the frontend Vite server
-    CORS(app)
+    # Enable CORS for the frontend Vite server dynamically
+    frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+    CORS(app, resources={r"/api/*": {"origins": frontend_url}})
     
     # Configure the SQLAlchemy database URL
     # Format: postgresql://username:password@localhost/dbname
@@ -22,7 +23,7 @@ def create_app():
     
     # Initialize plugins
     db.init_app(app)
-    socketio.init_app(app, cors_allowed_origins="*", async_mode='gevent')
+    socketio.init_app(app, cors_allowed_origins=[frontend_url, "http://localhost:5173"], async_mode='gevent')
     register_socket_events(socketio)
     
     # Register Blueprints
