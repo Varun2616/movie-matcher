@@ -4,6 +4,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 from models import db
 from routes.room import room_bp
+from sockets import socketio, register_socket_events
 
 # Load environment variables
 load_dotenv()
@@ -21,6 +22,8 @@ def create_app():
     
     # Initialize plugins
     db.init_app(app)
+    socketio.init_app(app, cors_allowed_origins="*", async_mode='gevent')
+    register_socket_events(socketio)
     
     # Register Blueprints
     app.register_blueprint(room_bp)
@@ -41,4 +44,4 @@ def create_app():
 
 if __name__ == '__main__':
     app = create_app()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
