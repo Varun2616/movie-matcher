@@ -89,6 +89,16 @@ def create_room():
     try:
         db.session.add(new_room)
         db.session.commit()
+        
+        # Add host as a User so their is_finished state can be tracked
+        host_user = User(
+            session_id=host_session_id,
+            display_name='Host',
+            room_id=new_room.id
+        )
+        db.session.add(host_user)
+        db.session.commit()
+        
         return jsonify({
             "room_code": code,
             "host_session_id": host_session_id,
@@ -147,7 +157,8 @@ def get_room_players(room_code):
     if not room:
         return jsonify({"error": "Room not found"}), 404
     
-    users = User.query.filter_by(room_id=room.id).all()
+    # Exclude the host from the players list so they aren't rendered twice
+    users = User.query.filter(User.room_id == room.id, User.session_id != room.host_session_id).all()
     return jsonify({
         "players": [u.to_dict() for u in users],
         "count": len(users)
