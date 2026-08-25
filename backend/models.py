@@ -42,6 +42,7 @@ class User(db.Model):
     display_name = db.Column(db.String(50), nullable=False)
     room_id = db.Column(db.Integer, db.ForeignKey('rooms.id'), nullable=False)
     joined_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    is_finished = db.Column(db.Boolean, default=False, nullable=False)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -67,6 +68,7 @@ class RoomMovie(db.Model):
     poster_path = db.Column(db.String(255))
     overview = db.Column(db.Text)
     vote_average = db.Column(db.Float)
+    score = db.Column(db.Integer, default=0, nullable=False)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -81,6 +83,7 @@ class RoomMovie(db.Model):
             'thumbnail': f"https://image.tmdb.org/t/p/w780{self.poster_path}" if self.poster_path else None,
             'overview': self.overview,
             'vote_average': self.vote_average,
+            'score': self.score,
             'cast': [],
             'whereToWatch': []
         }
