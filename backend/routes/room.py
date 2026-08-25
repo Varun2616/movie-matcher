@@ -26,7 +26,7 @@ def generate_room_code(length=6):
     return ''.join(random.choice(letters_and_digits) for i in range(length))
 
 
-def fetch_tmdb_movies(api_key, num_pages=2, industry=None):
+def fetch_tmdb_movies(api_key, num_pages=2, industry=None, language=None, providers=None, genres=None, runtime_limit=False):
     """Fetch popular movies from TMDB discover endpoint, optionally filtered by industry."""
     movies = []
     # Pick random pages between 1 and 10 to ensure a randomized deck
@@ -38,13 +38,23 @@ def fetch_tmdb_movies(api_key, num_pages=2, industry=None):
                 'sort_by': 'popularity.desc',
                 'include_adult': 'false',
                 'include_video': 'false',
-                'language': 'en-US',
                 'page': page,
                 'vote_count.gte': 50
             }
             # Apply industry-specific filters if provided
             if industry and industry in INDUSTRY_TMDB_PARAMS:
                 params.update(INDUSTRY_TMDB_PARAMS[industry])
+
+            # Override or add new filters
+            if language:
+                params['with_original_language'] = language.replace(',', '|')
+            if providers:
+                params['with_watch_providers'] = providers.replace(',', '|')
+                params['watch_region'] = 'IN'
+            if genres:
+                params['with_genres'] = genres.replace(',', '|')
+            if runtime_limit:
+                params['with_runtime.lte'] = 120
 
             resp = requests.get(
                 f'{TMDB_BASE_URL}/discover/movie',
@@ -175,6 +185,14 @@ def update_room_settings(room_code):
         room.target_recommendations = max(1, min(100, int(val)))
     if 'industry_filter' in data:
         room.industry_filter = data['industry_filter']
+    if 'language_filter' in data:
+        room.language_filter = data['language_filter']
+    if 'provider_filter' in data:
+        room.provider_filter = data['provider_filter']
+    if 'genre_filter' in data:
+        room.genre_filter = data['genre_filter']
+    if 'runtime_limit' in data:
+        room.runtime_limit = bool(data['runtime_limit'])
 
     try:
         db.session.commit()
@@ -205,6 +223,10 @@ def start_room(room_code):
         api_key = os.environ.get('TMDB_API_KEY')
         if api_key:
             industries = [i.strip() for i in room.industry_filter.split(',') if i.strip()]
+            languages = room.language_filter
+            providers = room.provider_filter
+            genres = room.genre_filter
+            runtime_limit = room.runtime_limit
             
             if industries:
                 # Fetch movies for each selected industry
@@ -212,14 +234,14 @@ def start_room(room_code):
                 seen_ids = set()
                 pages_per_industry = max(1, 3 // len(industries))  # Distribute pages across industries
                 for ind in industries:
-                    fetched = fetch_tmdb_movies(api_key, num_pages=pages_per_industry, industry=ind)
+                    fetched = fetch_tmdb_movies(api_key, num_pages=pages_per_industry, industry=ind, language=languages, providers=providers, genres=genres, runtime_limit=runtime_limit)
                     for m in fetched:
                         if m['id'] not in seen_ids:
                             all_movies.append(m)
                             seen_ids.add(m['id'])
             else:
                 # Default: popular movies globally
-                all_movies = fetch_tmdb_movies(api_key, num_pages=2)
+                all_movies = fetch_tmdb_movies(api_key, num_pages=2, language=languages, providers=providers, genres=genres, runtime_limit=runtime_limit)
 
             # Shuffle the fetched movies to randomize the deck
             random.shuffle(all_movies)

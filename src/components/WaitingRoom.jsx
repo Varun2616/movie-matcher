@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Copy, Check, Play, Users, Sliders, Loader2, Crown } from 'lucide-react';
 import { fetchPlayers, fetchRoomStatus, updateRoomSettings, startRoom } from '../api';
+import { socket } from '../socket';
 
 const INDUSTRIES = [
   { id: 'hollywood', label: 'Hollywood', emoji: '🇺🇸' },
@@ -9,6 +10,33 @@ const INDUSTRIES = [
   { id: 'kollywood', label: 'Kollywood', emoji: '🎬' },
   { id: 'malayalam', label: 'Malayalam', emoji: '🌴' },
   { id: 'tollywood', label: 'Tollywood', emoji: '🎥' },
+  { id: 'korean', label: 'Korean', emoji: '🇰🇷' },
+  { id: 'indonesian', label: 'Indonesian', emoji: '🇮🇩' },
+];
+
+const LANGUAGES = [
+  { id: 'hi', label: 'Hindi' },
+  { id: 'en', label: 'English' },
+  { id: 'te', label: 'Telugu' },
+  { id: 'ta', label: 'Tamil' },
+  { id: 'ml', label: 'Malayalam' },
+  { id: 'ko', label: 'Korean' },
+];
+
+const PROVIDERS = [
+  { id: '8', label: 'Netflix' },
+  { id: '9', label: 'Prime Video' },
+  { id: '337', label: 'Disney+' },
+  { id: '15', label: 'Hulu' },
+  { id: '1899', label: 'Max' },
+];
+
+const GENRES = [
+  { id: '28', label: 'Action' },
+  { id: '35', label: 'Comedy' },
+  { id: '27', label: 'Horror' },
+  { id: '878', label: 'Sci-Fi' },
+  { id: '10749', label: 'Romance' },
 ];
 
 export default function WaitingRoom({ roomCode, sessionId, isHost, displayName, onStartSwiping }) {
@@ -20,6 +48,10 @@ export default function WaitingRoom({ roomCode, sessionId, isHost, displayName, 
   // Host settings state
   const [targetRecs, setTargetRecs] = useState(10);
   const [selectedIndustries, setSelectedIndustries] = useState([]);
+  const [selectedLanguages, setSelectedLanguages] = useState([]);
+  const [selectedProviders, setSelectedProviders] = useState([]);
+  const [selectedGenres, setSelectedGenres] = useState([]);
+  const [runtimeLimit, setRuntimeLimit] = useState(false);
 
   // Poll for players every 3 seconds
   useEffect(() => {
@@ -36,23 +68,30 @@ export default function WaitingRoom({ roomCode, sessionId, isHost, displayName, 
     return () => clearInterval(interval);
   }, [roomCode]);
 
-  // Non-host players poll for room status changes
+  // Non-host players listen for game_started socket event
   useEffect(() => {
     if (isHost) return;
 
-    const pollStatus = async () => {
-      try {
-        const data = await fetchRoomStatus(roomCode);
-        if (data.status === 'swiping') {
-          onStartSwiping();
-        }
-      } catch (err) {
-        console.error('Failed to poll status:', err);
+    // Optional: still fetch once just in case we joined after start
+    fetchRoomStatus(roomCode).then(data => {
+      if (data.status === 'swiping') {
+        onStartSwiping();
       }
+    }).catch(err => console.error(err));
+
+    socket.on('game_started', () => {
+      onStartSwiping();
+    });
+
+    return () => {
+      socket.off('game_started');
     };
-    const interval = setInterval(pollStatus, 2000);
-    return () => clearInterval(interval);
   }, [roomCode, isHost, onStartSwiping]);
+
+  // Join the socket room on mount
+  useEffect(() => {
+    socket.emit('join_room', { room_code: roomCode });
+  }, [roomCode]);
 
   const handleCopyCode = useCallback(() => {
     navigator.clipboard.writeText(roomCode).then(() => {
@@ -61,10 +100,8 @@ export default function WaitingRoom({ roomCode, sessionId, isHost, displayName, 
     });
   }, [roomCode]);
 
-  const toggleIndustry = (id) => {
-    setSelectedIndustries(prev =>
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
+  const toggleSelection = (id, setter) => {
+    setter(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
   const handleStart = async () => {
@@ -74,10 +111,15 @@ export default function WaitingRoom({ roomCode, sessionId, isHost, displayName, 
       // Save settings first
       await updateRoomSettings(roomCode, sessionId, {
         target_recommendations: targetRecs,
-        industry_filter: selectedIndustries.join(',')
+        industry_filter: selectedIndustries.join(','),
+        language_filter: selectedLanguages.join(','),
+        provider_filter: selectedProviders.join(','),
+        genre_filter: selectedGenres.join(','),
+        runtime_limit: runtimeLimit
       });
       // Then trigger start (fetches TMDB movies and sets status to 'swiping')
       await startRoom(roomCode, sessionId);
+      socket.emit('start_swiping', { room_code: roomCode });
       onStartSwiping();
     } catch (err) {
       setError(err.message);
@@ -218,7 +260,7 @@ export default function WaitingRoom({ roomCode, sessionId, isHost, displayName, 
           </div>
 
           {/* Industry Filters */}
-          <div>
+          <div className="mb-6">
             <label className="text-white/60 text-xs font-medium uppercase tracking-wide block mb-3">
               Industry Filters
             </label>
@@ -229,7 +271,7 @@ export default function WaitingRoom({ roomCode, sessionId, isHost, displayName, 
                   <motion.button
                     key={ind.id}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => toggleIndustry(ind.id)}
+                    onClick={() => toggleSelection(ind.id, setSelectedIndustries)}
                     className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all duration-200 ${
                       active
                         ? 'bg-brand/20 border-brand/40 text-white'
@@ -244,6 +286,101 @@ export default function WaitingRoom({ roomCode, sessionId, isHost, displayName, 
             {selectedIndustries.length === 0 && (
               <p className="text-white/30 text-xs mt-2">No filter = top popular movies globally</p>
             )}
+          </div>
+
+          {/* Languages Filters */}
+          <div className="mb-6">
+            <label className="text-white/60 text-xs font-medium uppercase tracking-wide block mb-3">
+              Languages
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {LANGUAGES.map(lang => {
+                const active = selectedLanguages.includes(lang.id);
+                return (
+                  <motion.button
+                    key={lang.id}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => toggleSelection(lang.id, setSelectedLanguages)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-200 ${
+                      active
+                        ? 'bg-blue-500/20 border-blue-500/40 text-blue-200'
+                        : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white/70'
+                    }`}
+                  >
+                    {lang.label}
+                  </motion.button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Providers Filters */}
+          <div className="mb-6">
+            <label className="text-white/60 text-xs font-medium uppercase tracking-wide block mb-3">
+              Streaming Platforms
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {PROVIDERS.map(prov => {
+                const active = selectedProviders.includes(prov.id);
+                return (
+                  <motion.button
+                    key={prov.id}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => toggleSelection(prov.id, setSelectedProviders)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-200 ${
+                      active
+                        ? 'bg-purple-500/20 border-purple-500/40 text-purple-200'
+                        : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white/70'
+                    }`}
+                  >
+                    {prov.label}
+                  </motion.button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Genres Filters */}
+          <div className="mb-6">
+            <label className="text-white/60 text-xs font-medium uppercase tracking-wide block mb-3">
+              Genres
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {GENRES.map(genre => {
+                const active = selectedGenres.includes(genre.id);
+                return (
+                  <motion.button
+                    key={genre.id}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => toggleSelection(genre.id, setSelectedGenres)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-200 ${
+                      active
+                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-200'
+                        : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white/70'
+                    }`}
+                  >
+                    {genre.label}
+                  </motion.button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Runtime Limit */}
+          <div>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div className="relative">
+                <input 
+                  type="checkbox" 
+                  className="sr-only" 
+                  checked={runtimeLimit}
+                  onChange={(e) => setRuntimeLimit(e.target.checked)}
+                />
+                <div className={`block w-10 h-6 rounded-full transition-colors ${runtimeLimit ? 'bg-brand' : 'bg-zinc-700'}`}></div>
+                <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${runtimeLimit ? 'translate-x-4' : ''}`}></div>
+              </div>
+              <span className="text-sm font-semibold text-white/80">Limit to under 2 hours</span>
+            </label>
           </div>
         </motion.div>
       )}

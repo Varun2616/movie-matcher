@@ -12,6 +12,10 @@ class Room(db.Model):
     status = db.Column(db.String(20), default='waiting', nullable=False)
     target_recommendations = db.Column(db.Integer, default=10, nullable=False)
     industry_filter = db.Column(db.String(255), default='', nullable=False)  # Comma-separated: "hollywood,bollywood"
+    language_filter = db.Column(db.String(255), default='', nullable=False)
+    provider_filter = db.Column(db.String(255), default='', nullable=False)
+    genre_filter = db.Column(db.String(255), default='', nullable=False)
+    runtime_limit = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     
     # Relationship to User
@@ -30,6 +34,10 @@ class Room(db.Model):
             'status': self.status,
             'target_recommendations': self.target_recommendations,
             'industry_filter': self.industry_filter,
+            'language_filter': self.language_filter,
+            'provider_filter': self.provider_filter,
+            'genre_filter': self.genre_filter,
+            'runtime_limit': self.runtime_limit,
             'created_at': self.created_at.isoformat()
         }
 
