@@ -246,6 +246,9 @@ def start_room(room_code):
             # Shuffle the fetched movies to randomize the deck
             random.shuffle(all_movies)
 
+            if not all_movies:
+                return jsonify({"error": "No movies found matching these filters. Please broaden your search."}), 400
+
             # Limit the total number of fetched/saved movies to the host's configured target_recommendations
             all_movies = all_movies[:room.target_recommendations]
 
