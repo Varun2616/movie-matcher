@@ -5,7 +5,7 @@ import ActionButtons from './ActionButtons';
 import { fetchMovies } from '../api';
 import { socket } from '../socket';
 
-export default function SwipeDeck({ roomCode, sessionId, displayName, onDeckEmpty }) {
+export default function SwipeDeck({ roomCode, sessionId, displayName, onDeckEmpty, isTiebreaker }) {
   const [movies, setMovies] = useState([]);
   const [vetosLeft, setVetosLeft] = useState(3);
   const [loading, setLoading] = useState(true);
@@ -38,6 +38,7 @@ export default function SwipeDeck({ roomCode, sessionId, displayName, onDeckEmpt
     if (movies.length === 0) return;
     
     if (action === 'veto') {
+      if (isTiebreaker) return;
       if (vetosLeft > 0) {
         activeCardRef.current?.triggerSwipe('down');
       }
@@ -62,6 +63,7 @@ export default function SwipeDeck({ roomCode, sessionId, displayName, onDeckEmpt
   };
   
   const handleVetoUsed = () => {
+    if (isTiebreaker) return;
     const movie = movies[0];
     if (movie) {
       socket.emit('swipe', { room_code: roomCode, movie_id: movie.id, action: 'veto' });
@@ -148,7 +150,7 @@ export default function SwipeDeck({ roomCode, sessionId, displayName, onDeckEmpt
 
       {/* Action Buttons */}
       <div className="z-10 w-full max-w-sm">
-        <ActionButtons onAction={handleAction} vetosLeft={vetosLeft} disableVeto={vetosLeft === 0} />
+        <ActionButtons onAction={handleAction} vetosLeft={vetosLeft} disableVeto={vetosLeft === 0 || isTiebreaker} />
       </div>
 
     </div>

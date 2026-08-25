@@ -35,7 +35,7 @@ const SwipeCard = forwardRef(({ movie, index, isFront, onSwipe, onVeto }, ref) =
       if (direction === 'down') {
         onVeto();
       } else {
-        onSwipe();
+        onSwipe(direction);
       }
     }
   }));

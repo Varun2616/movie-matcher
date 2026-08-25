@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Trophy, Medal, Star, Loader2 } from 'lucide-react';
 import { fetchLeaderboard } from '../api';
+import { socket } from '../socket';
 
-export default function Leaderboard({ roomCode }) {
+export default function Leaderboard({ roomCode, sessionId, isHost }) {
   const [movies, setMovies] = useState([]);
+  const [isTie, setIsTie] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -14,6 +16,11 @@ export default function Leaderboard({ roomCode }) {
       try {
         const data = await fetchLeaderboard(roomCode);
         setMovies(data);
+        if (data.length > 1 && data[0].score > 0 && data[0].score === data[1].score) {
+          setIsTie(true);
+        } else {
+          setIsTie(false);
+        }
       } catch (err) {
         setError(err.message);
       } finally {
@@ -131,6 +138,31 @@ export default function Leaderboard({ roomCode }) {
           </div>
         )}
       </div>
+
+      {/* Host Controls */}
+      {isHost && (
+        <div className="w-full max-w-md z-10 mt-6 flex flex-col gap-3">
+          {isTie && (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => socket.emit('start_tiebreaker', { room_code: roomCode })}
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 text-white font-bold text-lg shadow-lg shadow-orange-500/30 flex items-center justify-center gap-2"
+            >
+              Run Tiebreaker
+            </motion.button>
+          )}
+          
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => socket.emit('return_to_lobby', { room_code: roomCode })}
+            className="w-full py-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-lg border border-white/20 flex items-center justify-center gap-2 transition-colors"
+          >
+            Return to Lobby
+          </motion.button>
+        </div>
+      )}
 
     </div>
   );
