@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: moviematcher_db
+    restart: always
+    environment:
+      POSTGRES_USER: movie_admin
+      POSTGRES_PASSWORD: secret_password
+      POSTGRES_DB: moviematcher
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
