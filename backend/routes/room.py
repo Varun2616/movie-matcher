@@ -29,7 +29,9 @@ def generate_room_code(length=6):
 def fetch_tmdb_movies(api_key, num_pages=2, industry=None):
     """Fetch popular movies from TMDB discover endpoint, optionally filtered by industry."""
     movies = []
-    for page in range(1, num_pages + 1):
+    # Pick random pages between 1 and 10 to ensure a randomized deck
+    pages_to_fetch = random.sample(range(1, 11), min(num_pages, 10))
+    for page in pages_to_fetch:
         try:
             params = {
                 'api_key': api_key,
@@ -218,6 +220,9 @@ def start_room(room_code):
             else:
                 # Default: popular movies globally
                 all_movies = fetch_tmdb_movies(api_key, num_pages=2)
+
+            # Shuffle the fetched movies to randomize the deck
+            random.shuffle(all_movies)
 
             # Limit the total number of fetched/saved movies to the host's configured target_recommendations
             all_movies = all_movies[:room.target_recommendations]
