@@ -49,6 +49,7 @@ def register_socket_events(socketio):
         # action == 'left' does nothing to score
 
         try:
+            db.session.add(movie)
             db.session.commit()
         except Exception as e:
             db.session.rollback()
