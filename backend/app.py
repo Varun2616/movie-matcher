@@ -17,7 +17,6 @@ def create_app():
     CORS(app, resources={r"/api/*": {"origins": frontend_url}})
     
     # Configure the SQLAlchemy database URL
-    # Format: postgresql://username:password@localhost/dbname
     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     
@@ -43,6 +42,8 @@ def create_app():
             
     return app
 
+# Expose app instance at top level for Gunicorn
+app = create_app()
+
 if __name__ == '__main__':
-    app = create_app()
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)
