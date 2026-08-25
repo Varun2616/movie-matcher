@@ -78,8 +78,10 @@ def register_socket_events(socketio):
                 print(f"Error updating user finished state: {e}")
                 return
                 
-            all_users = User.query.filter_by(room_id=room.id).all()
-            if all(u.is_finished for u in all_users):
+            total_users_count = User.query.filter_by(room_id=room.id).count()
+            finished_users_count = User.query.filter_by(room_id=room.id, is_finished=True).count()
+            
+            if total_users_count > 0 and finished_users_count >= total_users_count:
                 emit('show_leaderboard', to=room.room_code.upper())
                 print(f"Broadcasted show_leaderboard to room {room_code}")
 
