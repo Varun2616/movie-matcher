@@ -14,6 +14,8 @@ class Room(db.Model):
     
     # Relationship to User
     users = db.relationship('User', backref='room', lazy=True, cascade="all, delete-orphan")
+    # Relationship to RoomMovie
+    movies = db.relationship('RoomMovie', backref='room', lazy=True, cascade="all, delete-orphan")
 
     def to_dict(self):
         return {
@@ -41,4 +43,31 @@ class User(db.Model):
             'display_name': self.display_name,
             'room_id': self.room_id,
             'joined_at': self.joined_at.isoformat()
+        }
+
+
+class RoomMovie(db.Model):
+    __tablename__ = 'room_movies'
+
+    id = db.Column(db.Integer, primary_key=True)
+    room_id = db.Column(db.Integer, db.ForeignKey('rooms.id'), nullable=False)
+    tmdb_id = db.Column(db.Integer, nullable=False)
+    title = db.Column(db.String(255), nullable=False)
+    release_year = db.Column(db.Integer)
+    poster_path = db.Column(db.String(255))
+    overview = db.Column(db.Text)
+    vote_average = db.Column(db.Float)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'tmdb_id': self.tmdb_id,
+            'title': self.title,
+            'year': self.release_year,
+            'poster_path': self.poster_path,
+            'thumbnail': f"https://image.tmdb.org/t/p/w780{self.poster_path}" if self.poster_path else None,
+            'overview': self.overview,
+            'vote_average': self.vote_average,
+            'cast': [],
+            'whereToWatch': []
         }
