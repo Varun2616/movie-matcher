@@ -10,3 +10,4 @@ gevent
 gunicorn
 gevent-websocket
 packaging
+psycopg2-binary
