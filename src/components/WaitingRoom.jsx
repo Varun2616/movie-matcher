@@ -39,11 +39,12 @@ const GENRES = [
   { id: '10749', label: 'Romance' },
 ];
 
-export default function WaitingRoom({ roomCode, sessionId, isHost, displayName, onStartSwiping }) {
+export default function WaitingRoom({ roomCode, sessionId, isHost, displayName, onStartSwiping, onLeaveRoom }) {
   const [players, setPlayers] = useState([]);
   const [copied, setCopied] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
+  const [showConfirmEnd, setShowConfirmEnd] = useState(false);
 
   // Host settings state
   const [targetRecs, setTargetRecs] = useState(10);
@@ -64,8 +65,14 @@ export default function WaitingRoom({ roomCode, sessionId, isHost, displayName, 
       }
     };
     loadPlayers();
+    
+    socket.on('player_left', loadPlayers);
     const interval = setInterval(loadPlayers, 3000);
-    return () => clearInterval(interval);
+    
+    return () => {
+      clearInterval(interval);
+      socket.off('player_left', loadPlayers);
+    };
   }, [roomCode]);
 
   // Non-host players listen for game_started socket event
@@ -126,6 +133,20 @@ export default function WaitingRoom({ roomCode, sessionId, isHost, displayName, 
     } finally {
       setStarting(false);
     }
+  };
+
+  const handleLeaveClick = () => {
+    socket.emit('leave_room', { room_code: roomCode, session_id: sessionId });
+    onLeaveRoom();
+  };
+
+  const handleEndSessionClick = () => {
+    if (!showConfirmEnd) {
+      setShowConfirmEnd(true);
+      return;
+    }
+    socket.emit('leave_room', { room_code: roomCode, session_id: sessionId });
+    onLeaveRoom();
   };
 
   return (
@@ -392,13 +413,13 @@ export default function WaitingRoom({ roomCode, sessionId, isHost, displayName, 
         </div>
       )}
 
-      {/* Start Button (Host only) */}
+      {/* Start Button & End Session (Host only) */}
       {isHost && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="w-full max-w-md z-10 mt-auto pt-4 pb-2"
+          className="w-full max-w-md z-10 mt-auto pt-4 pb-2 flex flex-col gap-3"
         >
           <motion.button
             whileHover={{ scale: 1.02 }}
@@ -414,21 +435,51 @@ export default function WaitingRoom({ roomCode, sessionId, isHost, displayName, 
             )}
             {starting ? 'Loading Movies...' : 'Start Swiping'}
           </motion.button>
+          
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleEndSessionClick}
+            className={`w-full py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-colors ${
+              showConfirmEnd 
+                ? 'bg-red-500 text-white shadow-lg shadow-red-500/30' 
+                : 'bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20'
+            }`}
+          >
+            {showConfirmEnd ? 'Are you sure? Yes, End Session' : 'End Session'}
+          </motion.button>
+          {showConfirmEnd && (
+            <button 
+              onClick={() => setShowConfirmEnd(false)}
+              className="text-white/50 text-xs hover:text-white/80 pb-2"
+            >
+              Cancel
+            </button>
+          )}
         </motion.div>
       )}
 
-      {/* Non-host waiting message */}
+      {/* Non-host waiting message & Leave Room */}
       {!isHost && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
-          className="w-full max-w-md z-10 mt-auto pt-4 pb-2"
+          className="w-full max-w-md z-10 mt-auto pt-4 pb-2 flex flex-col gap-3"
         >
           <div className="w-full py-4 rounded-2xl glass-panel text-white/50 font-medium text-center flex items-center justify-center gap-3">
             <Loader2 size={18} className="animate-spin" />
             Waiting for host to start...
           </div>
+          
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleLeaveClick}
+            className="w-full py-3.5 rounded-2xl bg-white/5 text-white/60 border border-white/10 hover:bg-white/10 hover:text-white font-bold text-sm transition-colors"
+          >
+            Leave Room
+          </motion.button>
         </motion.div>
       )}
     </div>

@@ -153,3 +153,38 @@ def register_socket_events(socketio):
         except Exception as e:
             db.session.rollback()
             print(f"Error starting tiebreaker: {e}")
+
+    @socketio.on('leave_room')
+    def handle_leave_room(data):
+        room_code = data.get('room_code')
+        session_id = data.get('session_id')
+        
+        if not room_code or not session_id:
+            return
+            
+        room = Room.query.filter_by(room_code=room_code.upper()).first()
+        if not room:
+            return
+            
+        if room.host_session_id == session_id:
+            # Host is leaving: destroy the room entirely
+            try:
+                db.session.delete(room)
+                db.session.commit()
+                emit('room_closed', to=room.room_code.upper())
+                print(f"Room {room_code} closed by host.")
+            except Exception as e:
+                db.session.rollback()
+                print(f"Error deleting room: {e}")
+        else:
+            # Standard player is leaving: remove just their user record
+            user = User.query.filter_by(session_id=session_id, room_id=room.id).first()
+            if user:
+                try:
+                    db.session.delete(user)
+                    db.session.commit()
+                    emit('player_left', to=room.room_code.upper())
+                    print(f"Player {session_id} left room {room_code}.")
+                except Exception as e:
+                    db.session.rollback()
+                    print(f"Error deleting user: {e}")

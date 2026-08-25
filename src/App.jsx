@@ -21,9 +21,16 @@ function App() {
       setScreen('swiping');
       setIsTiebreaker(true);
     });
+    socket.on('room_closed', () => {
+      alert("The host has closed the room.");
+      setScreen('onboarding');
+      setRoomData(null);
+      setIsTiebreaker(false);
+    });
     return () => {
       socket.off('lobby_restarted');
       socket.off('tiebreaker_started');
+      socket.off('room_closed');
     };
   }, []);
 
@@ -38,6 +45,12 @@ function App() {
 
   const handleDeckEmpty = () => {
     setScreen('leaderboard');
+  };
+
+  const handleLeaveRoom = () => {
+    setScreen('onboarding');
+    setRoomData(null);
+    setIsTiebreaker(false);
   };
 
   return (
@@ -68,6 +81,7 @@ function App() {
             isHost={roomData.isHost}
             displayName={roomData.displayName}
             onStartSwiping={handleStartSwiping}
+            onLeaveRoom={handleLeaveRoom}
           />
         </motion.div>
       )}
