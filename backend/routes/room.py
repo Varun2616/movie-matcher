@@ -219,6 +219,9 @@ def start_room(room_code):
                 # Default: popular movies globally
                 all_movies = fetch_tmdb_movies(api_key, num_pages=2)
 
+            # Limit the total number of fetched/saved movies to the host's configured target_recommendations
+            all_movies = all_movies[:room.target_recommendations]
+
             # Insert movies into the room
             for m in all_movies:
                 release_date = m.get('release_date', '')
@@ -251,4 +254,18 @@ def get_room_movies(room_code):
         return jsonify({"error": "Room not found"}), 404
     
     movies = RoomMovie.query.filter_by(room_id=room.id).all()
+    return jsonify([m.to_dict() for m in movies]), 200
+
+
+@room_bp.route('/<room_code>/leaderboard', methods=['GET'])
+def get_leaderboard(room_code):
+    room = Room.query.filter_by(room_code=room_code.upper()).first()
+    
+    if not room:
+        return jsonify({"error": "Room not found"}), 404
+        
+    # Get all movies in the flashcard deck for that room, sorted by score descending
+    movies = RoomMovie.query.filter_by(room_id=room.id)\
+        .order_by(RoomMovie.score.desc()).all()
+        
     return jsonify([m.to_dict() for m in movies]), 200
