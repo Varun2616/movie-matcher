@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Copy, Check, Play, Users, Sliders, Loader2, Crown } from 'lucide-react';
+import { Copy, Check, Play, Users, Sliders, Loader2, Crown, Share2 } from 'lucide-react';
 import { fetchPlayers, fetchRoomStatus, updateRoomSettings, startRoom } from '../api';
 import { socket } from '../socket';
 
@@ -41,7 +41,7 @@ const GENRES = [
 
 export default function WaitingRoom({ roomCode, sessionId, isHost, displayName, onStartSwiping, onLeaveRoom }) {
   const [players, setPlayers] = useState([]);
-  const [copied, setCopied] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState('');
   const [showConfirmEnd, setShowConfirmEnd] = useState(false);
@@ -100,12 +100,33 @@ export default function WaitingRoom({ roomCode, sessionId, isHost, displayName, 
     socket.emit('join_room', { room_code: roomCode });
   }, [roomCode]);
 
-  const handleCopyCode = useCallback(() => {
-    navigator.clipboard.writeText(roomCode).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }, [roomCode]);
+  const handleShareCode = async () => {
+    const shareText = `Join my Movie Matcher room! Code: ${roomCode}`;
+    
+    // Fallback function for copying to clipboard
+    const fallbackCopy = () => {
+      navigator.clipboard.writeText(roomCode).then(() => {
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+      }).catch(err => console.error("Failed to copy", err));
+    };
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Movie Matcher',
+          text: shareText
+        });
+      } catch (err) {
+        // User cancelled or share failed, fallback to copy
+        if (err.name !== 'AbortError') {
+          fallbackCopy();
+        }
+      }
+    } else {
+      fallbackCopy();
+    }
+  };
 
   const toggleSelection = (id, setter) => {
     setter(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -170,21 +191,35 @@ export default function WaitingRoom({ roomCode, sessionId, isHost, displayName, 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="w-full max-w-md glass-panel rounded-2xl p-6 flex flex-col items-center gap-3 z-10 mb-5"
+        className="w-full max-w-md glass-panel rounded-2xl p-6 flex flex-col items-center gap-4 z-10 mb-5"
       >
         <p className="text-white/50 text-xs font-medium uppercase tracking-widest">Share this code</p>
-        <div className="flex items-center gap-4">
-          <span className="text-4xl font-extrabold tracking-[0.4em] text-white">
-            {roomCode}
-          </span>
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={handleCopyCode}
-            className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors"
-          >
-            {copied ? <Check size={20} className="text-green-400" /> : <Copy size={20} />}
-          </motion.button>
-        </div>
+        <span className="text-5xl font-extrabold tracking-[0.4em] text-white">
+          {roomCode}
+        </span>
+        
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={handleShareCode}
+          className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors ${
+            isCopied 
+              ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+              : 'bg-brand/20 text-brand border border-brand/30 hover:bg-brand/30'
+          }`}
+        >
+          {isCopied ? (
+            <>
+              <Check size={18} />
+              Code Copied!
+            </>
+          ) : (
+            <>
+              <Share2 size={18} />
+              Share Room Code
+            </>
+          )}
+        </motion.button>
       </motion.div>
 
       {/* Players List */}
